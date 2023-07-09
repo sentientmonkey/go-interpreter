@@ -105,25 +105,44 @@ return 993322;
 		)
 	})
 
-	Context("Identifier Expressions", func() {
-		It("Parses", func() {
-			input := "foobar;"
+	It("Parses Identifier Expressions", func() {
+		input := "foobar;"
 
-			l := lexer.New(input)
-			p := New(l)
+		l := lexer.New(input)
+		p := New(l)
 
-			program := p.ParseProgram()
-			Expect(p.Errors()).To(BeEmpty())
-			Expect(program.Statements).To(HaveLen(1), "not enough statements")
+		program := p.ParseProgram()
+		Expect(p.Errors()).To(BeEmpty())
+		Expect(program.Statements).To(HaveLen(1), "not enough statements")
 
-			stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
-			Expect(ok).To(BeTrue())
+		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+		Expect(ok).To(BeTrue())
 
-			ident, ok := stmt.Expression.(*ast.Identifier)
-			Expect(ok).To(BeTrue())
+		ident, ok := stmt.Expression.(*ast.Identifier)
+		Expect(ok).To(BeTrue())
 
-			Expect(ident.Value).To(Equal("foobar"))
-			Expect(ident.TokenLiteral()).To(Equal("foobar"))
-		})
+		Expect(ident.Value).To(Equal("foobar"))
+		Expect(ident.TokenLiteral()).To(Equal("foobar"))
 	})
+
+	It("Parses Integer Literals", func() {
+		input := "5;"
+
+		l := lexer.New(input)
+		p := New(l)
+
+		program := p.ParseProgram()
+		Expect(p.Errors()).To(BeEmpty())
+		Expect(program.Statements).To(HaveLen(1), "not enough statements")
+
+		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+		Expect(ok).To(BeTrue())
+
+		literal, ok := stmt.Expression.(*ast.IntegerLiteral)
+		Expect(ok).To(BeTrue(), "exp not *ast.IntegerLiteral")
+
+		Expect(literal.Value).To(Equal(int64(5)))
+		Expect(literal.TokenLiteral()).To(Equal("5"))
+	})
+
 })
