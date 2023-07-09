@@ -71,4 +71,38 @@ let 838383;
 			Entry("third error", 2, "expected next token to be IDENT, got INT instead"),
 		)
 	})
+
+	Context("Parsing Return Statements", Ordered, func() {
+		var program *ast.Program
+
+		BeforeAll(func() {
+			input := `
+return 5;
+return 10;
+return 993322;
+`
+
+			l := lexer.New(input)
+			p := New(l)
+
+			program = p.ParseProgram()
+			Expect(p.Errors()).To(BeEmpty())
+
+			Expect(program).ToNot(BeNil())
+			Expect(program.Statements).To(HaveLen(3))
+		})
+
+		DescribeTable("Parses Return statement",
+			func(index int) {
+				s := program.Statements[index]
+
+				Expect(s.TokenLiteral()).To(Equal("return"))
+				_, ok := s.(*ast.ReturnStatement)
+				Expect(ok).To(BeTrue())
+			},
+			Entry("first statement", 0),
+			Entry("second statement", 1),
+			Entry("third statement", 2),
+		)
+	})
 })
