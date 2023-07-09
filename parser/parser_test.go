@@ -88,8 +88,7 @@ return 993322;
 			program = p.ParseProgram()
 			Expect(p.Errors()).To(BeEmpty())
 
-			Expect(program).ToNot(BeNil())
-			Expect(program.Statements).To(HaveLen(3))
+			Expect(program.Statements).To(HaveLen(3), "not enough statements")
 		})
 
 		DescribeTable("Parses Return statement",
@@ -104,5 +103,27 @@ return 993322;
 			Entry("second statement", 1),
 			Entry("third statement", 2),
 		)
+	})
+
+	Context("Identifier Expressions", func() {
+		It("Parses", func() {
+			input := "foobar;"
+
+			l := lexer.New(input)
+			p := New(l)
+
+			program := p.ParseProgram()
+			Expect(p.Errors()).To(BeEmpty())
+			Expect(program.Statements).To(HaveLen(1), "not enough statements")
+
+			stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+			Expect(ok).To(BeTrue())
+
+			ident, ok := stmt.Expression.(*ast.Identifier)
+			Expect(ok).To(BeTrue())
+
+			Expect(ident.Value).To(Equal("foobar"))
+			Expect(ident.TokenLiteral()).To(Equal("foobar"))
+		})
 	})
 })
