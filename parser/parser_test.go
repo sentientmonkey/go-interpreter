@@ -202,9 +202,65 @@ return 993322;
 
 				Expect(exp.Right).To(BeIntegerLiteral(integerValue))
 			},
-			Entry("infix not", "!5", "!", int64(5)),
-			Entry("infix minus", "-15", "-", int64(15)),
+			Entry("prefix not", "!5", "!", int64(5)),
+			Entry("prefix minus", "-15", "-", int64(15)),
 		)
 	})
 
+	Context("Parsing Infix Expressions", Ordered, func() {
+		DescribeTable("Parses Infix statement",
+			func(input string, leftValue int64, operator string, rightValue int64) {
+				l := lexer.New(input)
+				p := New(l)
+
+				program := p.ParseProgram()
+				Expect(p.Errors()).To(BeEmpty())
+				Expect(program.Statements).To(HaveLen(1))
+
+				stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+				Expect(ok).To(BeTrue())
+
+				exp, ok := stmt.Expression.(*ast.InfixExpression)
+				Expect(ok).To(BeTrue())
+
+				Expect(exp.Left).To(BeIntegerLiteral(leftValue))
+				Expect(exp.Operator).To(Equal(operator))
+				Expect(exp.Right).To(BeIntegerLiteral(rightValue))
+			},
+			Entry("infix add", "5 + 5", int64(5), "+", int64(5)),
+			Entry("infix minus", "5 - 5", int64(5), "-", int64(5)),
+			Entry("infix mult", "5 * 5", int64(5), "*", int64(5)),
+			Entry("infix div", "5 / 5", int64(5), "/", int64(5)),
+			Entry("infix gt", "5 > 5", int64(5), ">", int64(5)),
+			Entry("infix lt", "5 < 5", int64(5), "<", int64(5)),
+			Entry("infix eq", "5 == 5", int64(5), "==", int64(5)),
+			Entry("infix ne", "5 != 5", int64(5), "!=", int64(5)),
+		)
+	})
+
+	Context("Parsing Operator Precedence Parsing", Ordered, func() {
+		DescribeTable("Parses",
+			func(input, expected string) {
+				l := lexer.New(input)
+				p := New(l)
+
+				program := p.ParseProgram()
+				Expect(p.Errors()).To(BeEmpty())
+
+				Expect(program.String()).To(Equal(expected))
+			},
+			Entry(nil, "-a * b", "((-a) * b)"),
+			Entry(nil, "!-a", "(!(-a))"),
+			Entry(nil, "a + b + c", "((a + b) + c)"),
+			Entry(nil, "a + b - c", "((a + b) - c)"),
+			Entry(nil, "a * b * c", "((a * b) * c)"),
+			Entry(nil, "a * b / c", "((a * b) / c)"),
+			Entry(nil, "a + b / c", "(a + (b / c))"),
+			Entry(nil, "a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+			Entry(nil, "3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+			Entry(nil, "5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+			Entry(nil, "5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+			Entry(nil, "3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
+		)
+	})
 })
