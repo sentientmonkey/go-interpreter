@@ -4,10 +4,54 @@ import (
 	"fmt"
 	"monkey/ast"
 	"monkey/lexer"
+	"reflect"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
+	"github.com/onsi/gomega/types"
 )
+
+func BeIntegerLiteral(expected int64) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(exp ast.Expression) (bool, error) {
+		integ, ok := exp.(*ast.IntegerLiteral)
+		if !ok {
+			return false, fmt.Errorf("Expected %v to be *ast.IntegerLiteral", reflect.TypeOf(exp))
+		}
+
+		if integ.Value != expected {
+			return false, fmt.Errorf("Expected .Value %d to be %d", integ.Value, expected)
+		}
+
+		actualToken := integ.TokenLiteral()
+		expectedToken := fmt.Sprintf("%d", expected)
+		if actualToken != expectedToken {
+			return false, fmt.Errorf("Expected .TokenLiteral() %q to be %q", actualToken, expectedToken)
+		}
+
+		return true, nil
+	})
+}
+
+func BeIdentifier(expected string) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(exp ast.Expression) (bool, error) {
+		ident, ok := exp.(*ast.Identifier)
+		if !ok {
+			return false, fmt.Errorf("Expected %v to be *ast.Identifier", reflect.TypeOf(exp))
+		}
+
+		if ident.Value != expected {
+			return false, fmt.Errorf("Expected .Value %q to be %q", ident.Value, expected)
+		}
+
+		actualToken := ident.TokenLiteral()
+		if actualToken != expected {
+			return false, fmt.Errorf("Expected .TokenLiteral() %q to be %q", actualToken, expected)
+		}
+
+		return true, nil
+	})
+}
 
 var _ = Describe("Parser", func() {
 	Context("Parsing a valid program", Ordered, func() {
@@ -120,11 +164,7 @@ return 993322;
 		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 		Expect(ok).To(BeTrue())
 
-		ident, ok := stmt.Expression.(*ast.Identifier)
-		Expect(ok).To(BeTrue())
-
-		Expect(ident.Value).To(Equal("foobar"))
-		Expect(ident.TokenLiteral()).To(Equal("foobar"))
+		Expect(stmt.Expression).To(BeIdentifier("foobar"))
 	})
 
 	It("Parses Integer Literals", func() {
@@ -140,11 +180,7 @@ return 993322;
 		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 		Expect(ok).To(BeTrue())
 
-		literal, ok := stmt.Expression.(*ast.IntegerLiteral)
-		Expect(ok).To(BeTrue(), "exp not *ast.IntegerLiteral")
-
-		Expect(literal.Value).To(Equal(int64(5)))
-		Expect(literal.TokenLiteral()).To(Equal("5"))
+		Expect(stmt.Expression).To(BeIntegerLiteral(5))
 	})
 
 	Context("Parsing Prefix Expressions", Ordered, func() {
@@ -164,11 +200,7 @@ return 993322;
 				Expect(ok).To(BeTrue())
 				Expect(exp.Operator).To(Equal(operator))
 
-				integ, ok := exp.Right.(*ast.IntegerLiteral)
-				Expect(ok).To(BeTrue())
-				Expect(integ.Value).To(Equal(integerValue))
-				Expect(integ.TokenLiteral()).To(Equal(fmt.Sprintf("%d", integerValue)))
-
+				Expect(exp.Right).To(BeIntegerLiteral(integerValue))
 			},
 			Entry("infix not", "!5", "!", int64(5)),
 			Entry("infix minus", "-15", "-", int64(15)),
