@@ -336,6 +336,11 @@ return 993322;
 			Entry(nil, "false", "false"),
 			Entry(nil, "3 > 5 == false", "((3 > 5) == false)"),
 			Entry(nil, "3 < 5 == true", "((3 < 5) == true)"),
+			Entry(nil, "1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+			Entry(nil, "(5 + 5) * 2", "((5 + 5) * 2)"),
+			Entry(nil, "2 / (5 + 5)", "(2 / (5 + 5))"),
+			Entry(nil, "-(5 + 5)", "(-(5 + 5))"),
+			Entry(nil, "!(true == true)", "(!(true == true))"),
 		)
 	})
 
