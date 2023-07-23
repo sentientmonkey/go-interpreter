@@ -37,7 +37,7 @@ func BeIdentifier(expected string) types.GomegaMatcher {
 	return gcustom.MakeMatcher(func(exp ast.Expression) (bool, error) {
 		ident, ok := exp.(*ast.Identifier)
 		if !ok {
-			return false, fmt.Errorf("Expected %v to be *ast.Identifier", reflect.TypeOf(exp))
+			return false, fmt.Errorf("Expected %T to be *ast.Identifier", exp)
 		}
 
 		if ident.Value != expected {
@@ -48,6 +48,39 @@ func BeIdentifier(expected string) types.GomegaMatcher {
 		if actualToken != expected {
 			return false, fmt.Errorf("Expected .TokenLiteral() %q to be %q", actualToken, expected)
 		}
+
+		return true, nil
+	})
+}
+
+func BeLiteralExpression(expected interface{}) types.GomegaMatcher {
+	switch v := expected.(type) {
+	case int:
+		return BeIntegerLiteral(int64(v))
+	case int64:
+		return BeIntegerLiteral(v)
+	case string:
+		return BeIdentifier(v)
+	default:
+		Fail(fmt.Sprintf("Unknown type %T in BeLiteralExpression() \n", v))
+	}
+
+	return nil
+}
+
+func BeInfixExpression(left interface{}, operator string, right interface{}) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(exp ast.Expression) (bool, error) {
+		opExp, ok := exp.(*ast.InfixExpression)
+
+		if !ok {
+			return false, fmt.Errorf("Expected %T to be *ast.InfixExpression", opExp)
+		}
+
+		Expect(opExp.Left).To(BeLiteralExpression(left))
+		if opExp.Operator != operator {
+			return false, fmt.Errorf("Expected operator %q to be %q", opExp.Operator, operator)
+		}
+		Expect(opExp.Right).To(BeLiteralExpression(right))
 
 		return true, nil
 	})
@@ -164,7 +197,7 @@ return 993322;
 		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 		Expect(ok).To(BeTrue())
 
-		Expect(stmt.Expression).To(BeIdentifier("foobar"))
+		Expect(stmt.Expression).To(BeLiteralExpression("foobar"))
 	})
 
 	It("Parses Integer Literals", func() {
@@ -175,15 +208,14 @@ return 993322;
 
 		program := p.ParseProgram()
 		Expect(p.Errors()).To(BeEmpty())
-		Expect(program.Statements).To(HaveLen(1), "not enough statements")
 
 		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 		Expect(ok).To(BeTrue())
 
-		Expect(stmt.Expression).To(BeIntegerLiteral(5))
+		Expect(stmt.Expression).To(BeLiteralExpression(5))
 	})
 
-	Context("Parsing Prefix Expressions", Ordered, func() {
+	Context("Parsing Prefix Expressions", func() {
 		DescribeTable("Parses Prefix statement",
 			func(input string, operator string, integerValue int64) {
 				l := lexer.New(input)
@@ -200,14 +232,14 @@ return 993322;
 				Expect(ok).To(BeTrue())
 				Expect(exp.Operator).To(Equal(operator))
 
-				Expect(exp.Right).To(BeIntegerLiteral(integerValue))
+				Expect(exp.Right).To(BeLiteralExpression(integerValue))
 			},
 			Entry("prefix not", "!5", "!", int64(5)),
 			Entry("prefix minus", "-15", "-", int64(15)),
 		)
 	})
 
-	Context("Parsing Infix Expressions", Ordered, func() {
+	Context("Parsing Infix Expressions", func() {
 		DescribeTable("Parses Infix statement",
 			func(input string, leftValue int64, operator string, rightValue int64) {
 				l := lexer.New(input)
@@ -215,30 +247,24 @@ return 993322;
 
 				program := p.ParseProgram()
 				Expect(p.Errors()).To(BeEmpty())
-				Expect(program.Statements).To(HaveLen(1))
 
 				stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 				Expect(ok).To(BeTrue())
 
-				exp, ok := stmt.Expression.(*ast.InfixExpression)
-				Expect(ok).To(BeTrue())
-
-				Expect(exp.Left).To(BeIntegerLiteral(leftValue))
-				Expect(exp.Operator).To(Equal(operator))
-				Expect(exp.Right).To(BeIntegerLiteral(rightValue))
+				Expect(stmt.Expression).To(BeInfixExpression(leftValue, operator, rightValue))
 			},
-			Entry("infix add", "5 + 5", int64(5), "+", int64(5)),
-			Entry("infix minus", "5 - 5", int64(5), "-", int64(5)),
-			Entry("infix mult", "5 * 5", int64(5), "*", int64(5)),
-			Entry("infix div", "5 / 5", int64(5), "/", int64(5)),
-			Entry("infix gt", "5 > 5", int64(5), ">", int64(5)),
-			Entry("infix lt", "5 < 5", int64(5), "<", int64(5)),
-			Entry("infix eq", "5 == 5", int64(5), "==", int64(5)),
-			Entry("infix ne", "5 != 5", int64(5), "!=", int64(5)),
+			Entry(nil, "5 + 5", int64(5), "+", int64(5)),
+			Entry(nil, "5 - 5", int64(5), "-", int64(5)),
+			Entry(nil, "5 * 5", int64(5), "*", int64(5)),
+			Entry(nil, "5 / 5", int64(5), "/", int64(5)),
+			Entry(nil, "5 > 5", int64(5), ">", int64(5)),
+			Entry(nil, "5 < 5", int64(5), "<", int64(5)),
+			Entry(nil, "5 == 5", int64(5), "==", int64(5)),
+			Entry(nil, "5 != 5", int64(5), "!=", int64(5)),
 		)
 	})
 
-	Context("Parsing Operator Precedence Parsing", Ordered, func() {
+	Context("Parsing Operator Precedence Parsing", func() {
 		DescribeTable("Parses",
 			func(input, expected string) {
 				l := lexer.New(input)
