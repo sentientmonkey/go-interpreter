@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"monkey/ast"
 	"monkey/lexer"
 
@@ -58,7 +59,7 @@ let 838383;
 			p = New(l)
 
 			p.ParseProgram()
-			Expect(p.Errors()).To(HaveLen(3))
+			Expect(p.Errors()).To(HaveLen(4))
 		})
 
 		DescribeTable("Returns errors",
@@ -68,7 +69,8 @@ let 838383;
 			},
 			Entry("first error", 0, "expected next token to be =, got INT instead"),
 			Entry("second error", 1, "expected next token to be IDENT, got = instead"),
-			Entry("third error", 2, "expected next token to be IDENT, got INT instead"),
+			Entry("second error", 2, "no prefix parse function for = found"),
+			Entry("third error", 3, "expected next token to be IDENT, got INT instead"),
 		)
 	})
 
@@ -143,6 +145,34 @@ return 993322;
 
 		Expect(literal.Value).To(Equal(int64(5)))
 		Expect(literal.TokenLiteral()).To(Equal("5"))
+	})
+
+	Context("Parsing Prefix Expressions", Ordered, func() {
+		DescribeTable("Parses Prefix statement",
+			func(input string, operator string, integerValue int64) {
+				l := lexer.New(input)
+				p := New(l)
+
+				program := p.ParseProgram()
+				Expect(p.Errors()).To(BeEmpty())
+				Expect(program.Statements).To(HaveLen(1))
+
+				stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+				Expect(ok).To(BeTrue())
+
+				exp, ok := stmt.Expression.(*ast.PrefixExpression)
+				Expect(ok).To(BeTrue())
+				Expect(exp.Operator).To(Equal(operator))
+
+				integ, ok := exp.Right.(*ast.IntegerLiteral)
+				Expect(ok).To(BeTrue())
+				Expect(integ.Value).To(Equal(integerValue))
+				Expect(integ.TokenLiteral()).To(Equal(fmt.Sprintf("%d", integerValue)))
+
+			},
+			Entry("infix not", "!5", "!", int64(5)),
+			Entry("infix minus", "-15", "-", int64(15)),
+		)
 	})
 
 })
