@@ -53,6 +53,30 @@ func BeIdentifier(expected string) types.GomegaMatcher {
 	})
 }
 
+func BeBooleanLiteral(expected bool) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(exp ast.Expression) (bool, error) {
+		bl, ok := exp.(*ast.Boolean)
+		if !ok {
+			return false, fmt.Errorf("Expected %T to be *ast.Boolean", exp)
+		}
+
+		if bl.Value != expected {
+			return false, fmt.Errorf("Expected .Value %v to be %v", bl.Value, expected)
+		}
+
+		actualToken := bl.TokenLiteral()
+
+		if expected && actualToken != "true" {
+			return false, fmt.Errorf("Expected .TokenLiteral() %q to be TRUE", actualToken)
+		}
+		if !expected && actualToken != "false" {
+			return false, fmt.Errorf("Expected .TokenLiteral() %q to be FALSE", actualToken)
+		}
+
+		return true, nil
+	})
+}
+
 func BeLiteralExpression(expected interface{}) types.GomegaMatcher {
 	switch v := expected.(type) {
 	case int:
@@ -61,6 +85,8 @@ func BeLiteralExpression(expected interface{}) types.GomegaMatcher {
 		return BeIntegerLiteral(v)
 	case string:
 		return BeIdentifier(v)
+	case bool:
+		return BeBooleanLiteral(v)
 	default:
 		Fail(fmt.Sprintf("Unknown type %T in BeLiteralExpression() \n", v))
 	}
@@ -80,6 +106,25 @@ func BeInfixExpression(left interface{}, operator string, right interface{}) typ
 		if opExp.Operator != operator {
 			return false, fmt.Errorf("Expected operator %q to be %q", opExp.Operator, operator)
 		}
+
+		Expect(opExp.Right).To(BeLiteralExpression(right))
+
+		return true, nil
+	})
+}
+
+func BePrefixExpression(operator string, right interface{}) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(exp ast.Expression) (bool, error) {
+		opExp, ok := exp.(*ast.PrefixExpression)
+
+		if !ok {
+			return false, fmt.Errorf("Expected %T to be *ast.PrefixExpression", opExp)
+		}
+
+		if opExp.Operator != operator {
+			return false, fmt.Errorf("Expected operator %q to be %q", opExp.Operator, operator)
+		}
+
 		Expect(opExp.Right).To(BeLiteralExpression(right))
 
 		return true, nil
@@ -217,7 +262,7 @@ return 993322;
 
 	Context("Parsing Prefix Expressions", func() {
 		DescribeTable("Parses Prefix statement",
-			func(input string, operator string, integerValue int64) {
+			func(input string, operator string, value interface{}) {
 				l := lexer.New(input)
 				p := New(l)
 
@@ -228,20 +273,18 @@ return 993322;
 				stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 				Expect(ok).To(BeTrue())
 
-				exp, ok := stmt.Expression.(*ast.PrefixExpression)
-				Expect(ok).To(BeTrue())
-				Expect(exp.Operator).To(Equal(operator))
-
-				Expect(exp.Right).To(BeLiteralExpression(integerValue))
+				Expect(stmt.Expression).To(BePrefixExpression(operator, value))
 			},
-			Entry("prefix not", "!5", "!", int64(5)),
-			Entry("prefix minus", "-15", "-", int64(15)),
+			Entry(nil, "!5", "!", 5),
+			Entry(nil, "-15", "-", 15),
+			Entry(nil, "!true", "!", true),
+			Entry(nil, "!false", "!", false),
 		)
 	})
 
 	Context("Parsing Infix Expressions", func() {
 		DescribeTable("Parses Infix statement",
-			func(input string, leftValue int64, operator string, rightValue int64) {
+			func(input string, leftValue interface{}, operator string, rightValue interface{}) {
 				l := lexer.New(input)
 				p := New(l)
 
@@ -253,14 +296,16 @@ return 993322;
 
 				Expect(stmt.Expression).To(BeInfixExpression(leftValue, operator, rightValue))
 			},
-			Entry(nil, "5 + 5", int64(5), "+", int64(5)),
-			Entry(nil, "5 - 5", int64(5), "-", int64(5)),
-			Entry(nil, "5 * 5", int64(5), "*", int64(5)),
-			Entry(nil, "5 / 5", int64(5), "/", int64(5)),
-			Entry(nil, "5 > 5", int64(5), ">", int64(5)),
-			Entry(nil, "5 < 5", int64(5), "<", int64(5)),
-			Entry(nil, "5 == 5", int64(5), "==", int64(5)),
-			Entry(nil, "5 != 5", int64(5), "!=", int64(5)),
+			Entry(nil, "5 + 5", 5, "+", 5),
+			Entry(nil, "5 - 5", 5, "-", 5),
+			Entry(nil, "5 * 5", 5, "*", 5),
+			Entry(nil, "5 / 5", 5, "/", 5),
+			Entry(nil, "5 > 5", 5, ">", 5),
+			Entry(nil, "5 < 5", 5, "<", 5),
+			Entry(nil, "5 == 5", 5, "==", 5),
+			Entry(nil, "5 != 5", 5, "!=", 5),
+			Entry(nil, "true == true", true, "==", true),
+			Entry(nil, "true != false", true, "!=", false),
 		)
 	})
 
@@ -287,6 +332,29 @@ return 993322;
 			Entry(nil, "5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
 			Entry(nil, "5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
 			Entry(nil, "3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
+			Entry(nil, "true", "true"),
+			Entry(nil, "false", "false"),
+			Entry(nil, "3 > 5 == false", "((3 > 5) == false)"),
+			Entry(nil, "3 < 5 == true", "((3 < 5) == true)"),
+		)
+	})
+
+	Context("Parses Boolean Literals", func() {
+		DescribeTable("Parses",
+			func(input string, expected bool) {
+				l := lexer.New(input)
+				p := New(l)
+
+				program := p.ParseProgram()
+				Expect(p.Errors()).To(BeEmpty())
+
+				stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+				Expect(ok).To(BeTrue())
+
+				Expect(stmt.Expression).To(BeLiteralExpression(expected))
+			},
+			Entry(nil, "true", true),
+			Entry(nil, "false", false),
 		)
 	})
 })
