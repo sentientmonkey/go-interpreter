@@ -362,4 +362,64 @@ return 993322;
 			Entry(nil, "false", false),
 		)
 	})
+
+	Context("Parses If Expressions", func() {
+		It("Should parse if", func() {
+			input := `if (x < y) { x }`
+
+			l := lexer.New(input)
+			p := New(l)
+
+			program := p.ParseProgram()
+			Expect(p.Errors()).To(BeEmpty())
+
+			stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+			Expect(ok).To(BeTrue())
+
+			exp, ok := stmt.Expression.(*ast.IfExpression)
+			Expect(ok).To(BeTrue())
+
+			Expect(exp.Condition).To(BeInfixExpression("x", "<", "y"))
+
+			Expect(exp.Consequence.Statements).To(HaveLen(1))
+
+			consequence, ok := exp.Consequence.Statements[0].(*ast.ExpressionStatement)
+			Expect(ok).To(BeTrue())
+
+			Expect(consequence.Expression).To(BeIdentifier("x"))
+			Expect(exp.Alternative).To(BeNil())
+		})
+
+		It("Should parse if else", func() {
+			input := `if (x < y) { x } else { y }`
+
+			l := lexer.New(input)
+			p := New(l)
+
+			program := p.ParseProgram()
+			Expect(p.Errors()).To(BeEmpty())
+
+			stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+			Expect(ok).To(BeTrue())
+
+			exp, ok := stmt.Expression.(*ast.IfExpression)
+			Expect(ok).To(BeTrue())
+
+			Expect(exp.Condition).To(BeInfixExpression("x", "<", "y"))
+
+			Expect(exp.Consequence.Statements).To(HaveLen(1))
+
+			consequence, ok := exp.Consequence.Statements[0].(*ast.ExpressionStatement)
+			Expect(ok).To(BeTrue())
+
+			Expect(consequence.Expression).To(BeIdentifier("x"))
+
+			Expect(exp.Alternative.Statements).To(HaveLen(1))
+			alternative, ok := exp.Alternative.Statements[0].(*ast.ExpressionStatement)
+			Expect(ok).To(BeTrue())
+
+			Expect(alternative.Expression).To(BeIdentifier("y"))
+		})
+
+	})
 })
