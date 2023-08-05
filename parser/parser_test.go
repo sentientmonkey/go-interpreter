@@ -15,6 +15,7 @@ import (
 func BeIntegerLiteral(expected int64) types.GomegaMatcher {
 	return gcustom.MakeMatcher(func(exp ast.Expression) (bool, error) {
 		integ, ok := exp.(*ast.IntegerLiteral)
+
 		if !ok {
 			return false, fmt.Errorf("Expected %v to be *ast.IntegerLiteral", reflect.TypeOf(exp))
 		}
@@ -421,5 +422,55 @@ return 993322;
 			Expect(alternative.Expression).To(BeIdentifier("y"))
 		})
 
+	})
+
+	Context("Parses function literals", func() {
+		It("Parses", func() {
+			input := `fn(x, y) { x + y }`
+
+			l := lexer.New(input)
+			p := New(l)
+
+			program := p.ParseProgram()
+			Expect(p.Errors()).To(BeEmpty())
+
+			Expect(program.Statements).To(HaveLen(1))
+
+			stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+			Expect(ok).To(BeTrue())
+
+			function, ok := stmt.Expression.(*ast.FunctionLiteral)
+			Expect(ok).To(BeTrue())
+
+			Expect(function.Parameters).To(HaveLen(2))
+			Expect(function.Parameters[0]).To(BeLiteralExpression("x"))
+			Expect(function.Parameters[1]).To(BeLiteralExpression("y"))
+
+			Expect(function.Body.Statements).To(HaveLen(1))
+			bodyStmt, ok := function.Body.Statements[0].(*ast.ExpressionStatement)
+			Expect(ok).To(BeTrue())
+			Expect(bodyStmt.Expression).To(BeInfixExpression("x", "+", "y"))
+		})
+		DescribeTable("Functional parameter Parsing",
+			func(input string, expectedParams []string) {
+				l := lexer.New(input)
+				p := New(l)
+
+				program := p.ParseProgram()
+				Expect(p.Errors()).To(BeEmpty())
+
+				stmt := program.Statements[0].(*ast.ExpressionStatement)
+				function := stmt.Expression.(*ast.FunctionLiteral)
+
+				Expect(function.Parameters).To(HaveLen(len(expectedParams)))
+
+				for i, ident := range expectedParams {
+					Expect(function.Parameters[i]).To(BeLiteralExpression(ident))
+				}
+			},
+			Entry(nil, "fn() {}", []string{}),
+			Entry(nil, "fn(x) {}", []string{"x"}),
+			Entry(nil, "fn(x, y, z) {}", []string{"x", "y", "z"}),
+		)
 	})
 })
