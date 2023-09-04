@@ -342,6 +342,18 @@ return 993322;
 			Entry(nil, "2 / (5 + 5)", "(2 / (5 + 5))"),
 			Entry(nil, "-(5 + 5)", "(-(5 + 5))"),
 			Entry(nil, "!(true == true)", "(!(true == true))"),
+			Entry(nil,
+				"a + add(b * c) + d",
+				"((a + add((b * c))) + d)",
+			),
+			Entry(nil,
+				"add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+				"add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+			),
+			Entry(nil,
+				"add(a + b + c * d / f + g)",
+				"add((((a + b) + ((c * d) / f)) + g))",
+			),
 		)
 	})
 
@@ -472,5 +484,29 @@ return 993322;
 			Entry(nil, "fn(x) {}", []string{"x"}),
 			Entry(nil, "fn(x, y, z) {}", []string{"x", "y", "z"}),
 		)
+	})
+	Context("Parser Call Expression", func() {
+		It("Parses", func() {
+			input := `add(1, 2 * 3, 4 + 5);`
+
+			l := lexer.New(input)
+			p := New(l)
+
+			program := p.ParseProgram()
+			Expect(p.Errors()).To(BeEmpty())
+			Expect(program.Statements).To(HaveLen(1))
+
+			stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+			Expect(ok).To(BeTrue())
+
+			exp, ok := stmt.Expression.(*ast.CallExpression)
+			Expect(ok).To(BeTrue())
+
+			Expect(exp.Function).To(BeIdentifier("add"))
+			Expect(exp.Arguments).To(HaveLen(3))
+			Expect(exp.Arguments[0]).To(BeLiteralExpression(1))
+			Expect(exp.Arguments[1]).To(BeInfixExpression(2, "*", 3))
+			Expect(exp.Arguments[2]).To(BeInfixExpression(4, "+", 5))
+		})
 	})
 })
