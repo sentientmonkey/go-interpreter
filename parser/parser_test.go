@@ -132,6 +132,23 @@ func BePrefixExpression(operator string, right interface{}) types.GomegaMatcher 
 	})
 }
 
+func BeLetStatement(name string) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(stmt ast.Statement) (bool, error) {
+		Expect(stmt.TokenLiteral()).To(Equal("let"))
+
+		letStmt, ok := stmt.(*ast.LetStatement)
+
+		if !ok {
+			return false, fmt.Errorf("Expected %T to be *ast.LetStatement", letStmt)
+		}
+
+		Expect(letStmt.Name.Value).To(Equal(name))
+		Expect(letStmt.Name.TokenLiteral()).To(Equal(name))
+
+		return true, nil
+	})
+}
+
 var _ = Describe("Parser", func() {
 	Context("Parsing a valid program", Ordered, func() {
 		var program *ast.Program
@@ -508,5 +525,28 @@ return 993322;
 			Expect(exp.Arguments[1]).To(BeInfixExpression(2, "*", 3))
 			Expect(exp.Arguments[2]).To(BeInfixExpression(4, "+", 5))
 		})
+	})
+	Context("Let Statements", func() {
+		DescribeTable("Parses",
+			func(input, expectedIdentifier string, expectedValue any) {
+				l := lexer.New(input)
+				p := New(l)
+
+				program := p.ParseProgram()
+				Expect(p.Errors()).To(BeEmpty())
+
+				Expect(program.Statements).To(HaveLen(1))
+				stmt := program.Statements[0]
+
+				Expect(stmt).To(BeLetStatement(expectedIdentifier))
+
+				val := stmt.(*ast.LetStatement).Value
+
+				Expect(val).To(BeLiteralExpression(expectedValue))
+			},
+			Entry(nil, "let x = 5;", "x", 5),
+			Entry(nil, "let y = true;", "y", true),
+			Entry(nil, "let foobar = y;", "foobar", "y"),
+		)
 	})
 })
